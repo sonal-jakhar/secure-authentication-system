@@ -1,0 +1,9 @@
+# Phase 1 dependencies for Secure User Authentication System
+# hashlib.pbkdf2_hmac is part of the Python standard library (no extra package)
+
+streamlit>=1.32.0
+cryptography>=42.0.0
+pyotp>=2.9.0
+qrcode>=7.4.2
+python-dotenv>=1.0.1
+pytest>=8.0.0
