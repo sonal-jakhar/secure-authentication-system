@@ -167,12 +167,14 @@ def login(
         _dummy_password_check(password)
         return AuthResult(success=False, code="invalid_credentials")
 
-    if _is_locked(user, current_time):
-        _safe_password_check(password, user)
-        return AuthResult(success=False, code="locked")
-
-    if not _safe_password_check(password, user):
+    password_ok = _safe_password_check(password, user)
+    if not password_ok:
+        # Wrong passwords never report lockout, so usernames are not confirmed
+        # by the "locked" result. Lockout is stored on the account anyway.
         return _fail_login(connection, user, current_time, policy)
+
+    if _is_locked(user, current_time):
+        return AuthResult(success=False, code="locked")
 
     if user["totp_enabled"]:
         if otp is None:
@@ -250,14 +252,12 @@ def _fail_login(
     policy: SecurityPolicy,
 ) -> AuthResult:
     lock_time = _iso(now + timedelta(seconds=policy.lockout_seconds))
-    updated = record_login_failure(
+    record_login_failure(
         connection,
         user["id"],
         failed_attempt_limit=policy.failed_attempt_limit,
         locked_until=lock_time,
     )
-    if updated is not None and updated["failed_attempts"] >= policy.failed_attempt_limit:
-        return AuthResult(success=False, code="locked")
     return AuthResult(success=False, code="invalid_credentials")
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 import pytest
@@ -11,8 +12,12 @@ from src.db.schema import EXPECTED_USER_COLUMNS
 from src.db.users import (
     DuplicateUsernameError,
     claim_totp_step,
+    confirm_pending_totp_secret,
     get_user_by_username,
     insert_user,
+    record_login_failure,
+    record_login_success,
+    set_pending_totp_secret,
 )
 
 
@@ -118,3 +123,62 @@ def test_claim_totp_step_rejects_replay(db_connection):
     assert claim_totp_step(db_connection, user_id, 100) is False
     assert claim_totp_step(db_connection, user_id, 99) is False
     assert claim_totp_step(db_connection, user_id, 101) is True
+
+
+def test_confirm_pending_totp_secret_enables_totp(db_connection):
+    user_id = insert_user(db_connection, **_sample_user_fields(username="dana"))
+    set_pending_totp_secret(db_connection, user_id, "pending-ciphertext")
+
+    assert confirm_pending_totp_secret(db_connection, user_id, 42) is True
+    stored = get_user_by_username(db_connection, "dana")
+    assert stored["totp_enabled"] == 1
+    assert stored["encrypted_totp_secret"] == "pending-ciphertext"
+    assert stored["pending_encrypted_totp_secret"] is None
+    assert stored["last_accepted_totp_step"] == 42
+    assert confirm_pending_totp_secret(db_connection, user_id, 43) is False
+
+
+def test_record_login_failure_and_success(db_connection):
+    user_id = insert_user(db_connection, **_sample_user_fields(username="erin"))
+
+    first = record_login_failure(
+        db_connection, user_id, failed_attempt_limit=5, locked_until="lock-time"
+    )
+    assert first["failed_attempts"] == 1
+    assert first["locked_until"] is None
+
+    for _ in range(4):
+        updated = record_login_failure(
+            db_connection, user_id, failed_attempt_limit=5, locked_until="lock-time"
+        )
+    assert updated["failed_attempts"] == 5
+    assert updated["locked_until"] == "lock-time"
+
+    record_login_success(db_connection, user_id, last_login="2026-01-01T00:00:00+00:00")
+    stored = get_user_by_username(db_connection, "erin")
+    assert stored["failed_attempts"] == 0
+    assert stored["locked_until"] is None
+    assert stored["last_login"] == "2026-01-01T00:00:00+00:00"
+
+
+def test_claim_totp_step_is_atomic_across_connections(db_path: Path):
+    setup = get_connection(db_path)
+    user_id = insert_user(setup, **_sample_user_fields(username="frank"))
+    setup.close()
+
+    results: list[bool] = []
+    barrier = threading.Barrier(2)
+
+    def claim() -> None:
+        connection = get_connection(db_path)
+        barrier.wait()
+        results.append(claim_totp_step(connection, user_id, 77))
+        connection.close()
+
+    workers = [threading.Thread(target=claim), threading.Thread(target=claim)]
+    for worker in workers:
+        worker.start()
+    for worker in workers:
+        worker.join()
+
+    assert sorted(results) == [False, True]
