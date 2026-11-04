@@ -1,1 +1,1 @@
-"""Streamlit application package. UI will be added in a later phase."""
+"""Streamlit user interface. Authentication business logic stays in src.auth."""
