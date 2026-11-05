@@ -330,6 +330,3 @@ python -m pytest -v
 5. D. M'Raihi et al., IETF, [RFC 6238: TOTP — Time-Based One-Time Password Algorithm](https://www.rfc-editor.org/rfc/rfc6238.html), 2011.
 6. OWASP, [Password Storage Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html). Guidance on password hashing, salts, and work factors.
 
-## 20. Author
-
-**Sonal Jakhar** — [GitHub profile](https://github.com/sonal-jakhar)
