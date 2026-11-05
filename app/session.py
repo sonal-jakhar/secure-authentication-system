@@ -13,6 +13,8 @@ AUTH_USERNAME = "auth_username"
 ENROL_QR_PNG = "enrol_qr_png"
 ENROL_MANUAL_KEY = "enrol_manual_key"
 NAV_PAGE = "nav_page"
+FLASH_MESSAGE = "flash_message"
+FLASH_KIND = "flash_kind"
 
 _AUTH_KEYS = (
     AUTH_USER_ID,
@@ -40,6 +42,19 @@ def clear_enrolment(state: MutableMapping) -> None:
 def logout(state: MutableMapping) -> None:
     for key in _AUTH_KEYS:
         state.pop(key, None)
+
+
+def set_flash(state: MutableMapping, message: str, kind: str = "success") -> None:
+    state[FLASH_MESSAGE] = message
+    state[FLASH_KIND] = kind
+
+
+def consume_flash(state: MutableMapping) -> tuple[str, str] | None:
+    message = state.pop(FLASH_MESSAGE, None)
+    kind = state.pop(FLASH_KIND, "success")
+    if not message:
+        return None
+    return str(message), str(kind)
 
 
 def login_error_message(code: str) -> str:

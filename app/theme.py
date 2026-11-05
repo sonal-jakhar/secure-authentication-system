@@ -6,90 +6,121 @@ import streamlit as st
 
 CSS = """
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
-
-    html, body, [class*="css"] {
-        font-family: "Source Sans 3", "Segoe UI", sans-serif;
+    :root {
+        --ink: #202b36;
+        --muted: #5f6b77;
+        --line: #dce2e8;
+        --surface: #ffffff;
+        --canvas: #f7f8fa;
+        --blue: #245b8f;
+        --blue-hover: #19466f;
+        --green-bg: #e8f4ec;
+        --green-ink: #24613a;
+        --amber-bg: #fff4dc;
+        --amber-ink: #75530d;
     }
 
-    .stApp {
-        background:
-            radial-gradient(1200px 500px at 10% -10%, #14324a 0%, transparent 55%),
-            linear-gradient(180deg, #0e1720 0%, #111c27 40%, #0c141c 100%);
-        color: #e8eef4;
+    html, body, [class*="css"] {
+        font-family: "Segoe UI", Tahoma, sans-serif;
+        color: var(--ink);
+    }
+
+    .stApp { background: var(--canvas); }
+
+    [data-testid="stMain"] > div {
+        max-width: 1120px;
+        padding-top: 2rem;
     }
 
     [data-testid="stSidebar"] {
-        background: #0b141c;
-        border-right: 1px solid #243544;
+        background: #f0f3f6;
+        border-right: 1px solid var(--line);
     }
 
-    [data-testid="stSidebar"] * {
-        color: #d7e3ee;
-    }
+    [data-testid="stSidebar"] * { color: var(--ink); }
+    [data-testid="stSidebar"] [data-testid="stRadio"] label { color: var(--ink); }
 
     h1, h2, h3 {
-        letter-spacing: -0.02em;
-        color: #f4f8fb !important;
+        color: var(--ink) !important;
+        font-weight: 600 !important;
+        letter-spacing: 0;
     }
 
-    .hero-card, .panel-card {
-        background: rgba(18, 32, 45, 0.92);
-        border: 1px solid #2b4254;
-        border-radius: 16px;
-        padding: 1.25rem 1.4rem;
-        margin-bottom: 1rem;
-        box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
-    }
+    h1 { font-size: 1.9rem !important; }
+    h2 { font-size: 1.4rem !important; }
+    h3 { font-size: 1.12rem !important; }
 
     .eyebrow {
-        color: #7dcec4;
-        font-size: 0.78rem;
-        font-weight: 700;
-        letter-spacing: 0.14em;
+        color: var(--blue);
+        font-size: 0.76rem;
+        font-weight: 600;
         text-transform: uppercase;
         margin-bottom: 0.35rem;
     }
 
-    .muted {
-        color: #a9bbc9;
-        line-height: 1.55;
+    .muted, [data-testid="stCaptionContainer"] { color: var(--muted); }
+
+    div[data-testid="stForm"] {
+        max-width: 680px;
+        margin: 0 auto 1rem;
+        padding: 1.1rem 1.25rem;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: 5px;
     }
 
     .status-pill {
         display: inline-block;
-        padding: 0.2rem 0.65rem;
-        border-radius: 999px;
+        padding: 0.22rem 0.58rem;
+        border: 1px solid transparent;
+        border-radius: 4px;
         font-size: 0.82rem;
         font-weight: 600;
-        margin-right: 0.4rem;
+        margin-right: 0.45rem;
     }
 
-    .status-on { background: #134e4a; color: #99f6e4; }
-    .status-off { background: #3f2d12; color: #fde68a; }
+    .status-on { background: var(--green-bg); color: var(--green-ink); }
+    .status-off { background: var(--amber-bg); color: var(--amber-ink); }
 
-    code, .stCode, pre {
-        font-family: "IBM Plex Mono", ui-monospace, monospace !important;
-    }
+    code, .stCode, pre { font-family: Consolas, "Courier New", monospace !important; }
 
-    .stButton > button {
-        background: #1f8a80;
-        color: white;
-        border: 0;
-        border-radius: 10px;
-        font-weight: 600;
+    .stButton > button,
+    [data-testid="stFormSubmitButton"] > button {
+        min-height: 2.45rem;
         padding: 0.45rem 1rem;
+        color: #fff;
+        background: var(--blue);
+        border: 1px solid var(--blue);
+        border-radius: 4px;
+        font-weight: 600;
     }
 
-    .stButton > button:hover {
-        background: #176e66;
-        color: white;
+    .stButton > button:hover,
+    [data-testid="stFormSubmitButton"] > button:hover {
+        color: #fff;
+        background: var(--blue-hover);
+        border-color: var(--blue-hover);
     }
+
+    [data-testid="stTextInput"] input {
+        background: #fff;
+        border-color: #cbd3dc;
+        border-radius: 4px;
+    }
+
+    [data-testid="stTextInput"] input:focus {
+        border-color: var(--blue);
+        box-shadow: 0 0 0 1px var(--blue);
+    }
+
+    hr { border-color: var(--line); }
 
     .footnote {
-        color: #8aa0b2;
-        font-size: 0.85rem;
-        margin-top: 1.5rem;
+        color: var(--muted);
+        font-size: 0.82rem;
+        margin-top: 2rem;
+        border-top: 1px solid var(--line);
+        padding-top: 0.75rem;
     }
 </style>
 """

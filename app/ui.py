@@ -1,4 +1,12 @@
-"""Streamlit pages. All authentication goes through src.auth.service."""
+"""Streamlit pages. All authentication goes through src.auth.service.
+
+The UI calls these backend functions and does not reimplement them:
+- src.auth.service.register_user
+- src.auth.service.login
+- src.auth.service.start_totp_enrolment
+- src.auth.service.confirm_totp_enrolment
+- src.db.users.get_user_by_username (reads totp_enabled only for display)
+"""
 
 from __future__ import annotations
 
@@ -6,6 +14,7 @@ from urllib.parse import parse_qs, urlparse
 
 import streamlit as st
 
+from app.breach_lab import render_breach_lab
 from app.demo import SAMPLE_DEMO_PASSWORD, pbkdf2_demo_digest, unsalted_sha1_hex
 from app.session import (
     AUTH_USERNAME,
@@ -13,10 +22,12 @@ from app.session import (
     ENROL_QR_PNG,
     NAV_PAGE,
     clear_enrolment,
+    consume_flash,
     establish_session,
     is_authenticated,
     login_error_message,
     logout,
+    set_flash,
 )
 from app.theme import apply
 from src.auth.password import PBKDF2_ITERATIONS
@@ -31,102 +42,61 @@ from src.crypto.secret_vault import MissingFernetKeyError
 from src.db.connection import get_connection, initialize_database
 from src.db.users import DuplicateUsernameError, get_user_by_username
 
-PAGES = (
-    "Overview",
-    "Register",
-    "Login",
-    "Dashboard",
-    "Case study",
-)
-
-
 def run() -> None:
     apply()
     initialize_database()
-    _sidebar()
-    page = st.session_state.get(NAV_PAGE, "Overview")
-    if page == "Overview":
-        _overview()
-    elif page == "Register":
-        _register()
-    elif page == "Login":
-        _login()
-    elif page == "Dashboard":
-        _dashboard()
-    else:
-        _case_study()
-    st.markdown(
-        '<p class="footnote">Demonstration only. Streamlit session state is not '
-        "a production-grade session mechanism.</p>",
-        unsafe_allow_html=True,
-    )
+    account_page = st.session_state.get(NAV_PAGE, "Login")
+    if account_page not in {"Register", "Login", "Dashboard", "Case study"}:
+        account_page = "Dashboard" if is_authenticated(st.session_state) else "Login"
+        st.session_state[NAV_PAGE] = account_page
 
-
-def _sidebar() -> None:
-    st.sidebar.markdown("### Secure Auth Lab")
-    st.sidebar.caption("Password hashing and TOTP · college demonstration")
-    if is_authenticated(st.session_state):
-        st.sidebar.success(f"Signed in as {st.session_state[AUTH_USERNAME]}")
-    else:
-        st.sidebar.info("Not signed in")
-    current = st.session_state.get(NAV_PAGE, "Overview")
-    if current not in PAGES:
-        current = "Overview"
-    choice = st.sidebar.radio("Navigate", list(PAGES), index=PAGES.index(current))
-    st.session_state[NAV_PAGE] = choice
-    st.sidebar.markdown(
-        "Use **Register** and **Login** for the live system. "
-        "**Case study** is educational and is not part of authentication."
-    )
-
-
-def _overview() -> None:
-    st.markdown('<div class="eyebrow">Information and Network Security</div>', unsafe_allow_html=True)
-    st.title("Secure User Authentication")
-    st.markdown(
-        """
-        <div class="hero-card">
-          <p class="muted">
-            This demonstration registers and authenticates users with
-            <strong>PBKDF2-HMAC-SHA256</strong> password hashing, optional
-            <strong>TOTP</strong> two-factor authentication, and
-            <strong>Fernet</strong> encryption of authenticator secrets at rest.
-          </p>
-          <p class="muted">
-            Passwords are never stored in plaintext. The dashboard never shows
-            hashes, salts, or encryption keys.
-          </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    left, right = st.columns(2)
-    with left:
-        st.subheader("What you can do")
-        st.markdown(
-            "- Create an account\n"
-            "- Sign in with your password\n"
-            "- Enable an authenticator app (optional)\n"
-            "- Review the LinkedIn 2012 password-storage case study"
+    account_tab, breach_tab = st.tabs(("Account", "Breach Lab"))
+    with account_tab:
+        _show_flash()
+        if account_page == "Register":
+            _register()
+        elif account_page == "Dashboard":
+            _dashboard()
+        elif account_page == "Case study":
+            _case_study()
+        else:
+            _login()
+        st.caption(
+            "Demonstration only. Streamlit session state is not a production-grade "
+            "session mechanism."
         )
-    with right:
-        st.subheader("What this app does not do")
-        st.markdown(
-            "- It does not store or display your password\n"
-            "- It does not crack or search leaked password lists\n"
-            "- It does not claim Streamlit cookies are a full session server"
-        )
+    with breach_tab:
+        render_breach_lab()
+
+
+def _show_flash() -> None:
+    flash = consume_flash(st.session_state)
+    if flash is None:
+        return
+    message, kind = flash
+    if kind == "error":
+        st.error(message)
+    elif kind == "warning":
+        st.warning(message)
+    else:
+        st.success(message)
 
 
 def _register() -> None:
     st.title("Create an account")
     st.caption("Usernames may contain letters, digits, hyphens and underscores.")
     with st.form("register_form"):
-        username = st.text_input("Choose a username")
-        password = st.text_input("Password", type="password")
-        confirm = st.text_input("Confirm password", type="password")
-        submitted = st.form_submit_button("Create account")
+        username = st.text_input("Choose a username", key="register_username")
+        password = st.text_input("Password", type="password", key="register_password")
+        confirm = st.text_input("Confirm password", type="password", key="register_confirm")
+        submitted = st.form_submit_button("Create account", key="register_submit")
     if not submitted:
+        if st.button("Already have an account? Sign in", key="register_login_link"):
+            st.session_state[NAV_PAGE] = "Login"
+            st.rerun()
+        return
+    if not username.strip() or not password:
+        st.error("Enter a username and password.")
         return
     if password != confirm:
         st.error("Passwords do not match.")
@@ -137,25 +107,33 @@ def _register() -> None:
     except DuplicateUsernameError:
         st.error("That username is not available.")
         return
-    except (TypeError, ValueError) as exc:
-        st.error(str(exc))
+    except (TypeError, ValueError):
+        st.error("Check the username and password and try again.")
         return
     finally:
         connection.close()
-    st.success("Account created. You can sign in from the Login page.")
+    set_flash(st.session_state, "Account created. You can sign in now.")
     st.session_state[NAV_PAGE] = "Login"
     st.rerun()
+    
 
 
 def _login() -> None:
     st.title("Sign in")
-    st.caption("If you enabled two-factor authentication, enter the 6-digit code as well.")
+    st.caption(
+        "Leave the one-time code blank unless you have already enabled 2FA. "
+        "The field is always shown so this page does not reveal who uses 2FA."
+    )
     with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
-        otp = st.text_input("One-time code (if 2FA is enabled)")
-        submitted = st.form_submit_button("Sign in")
+        username = st.text_input("Username", key="login_username")
+        password = st.text_input("Password", type="password", key="login_password")
+        otp = st.text_input("One-time code (if 2FA is enabled)", key="login_otp")
+        submitted = st.form_submit_button("Sign in", key="login_submit")
     if not submitted:
+        st.caption("New here?")
+        if st.button("Create an account", key="login_register_link"):
+            st.session_state[NAV_PAGE] = "Register"
+            st.rerun()
         return
     otp_value = otp.strip() or None
     connection = get_connection()
@@ -170,7 +148,6 @@ def _login() -> None:
         st.session_state, user_id=result.user_id, username=result.username
     )
     st.session_state[NAV_PAGE] = "Dashboard"
-    st.success("Signed in.")
     st.rerun()
 
 
@@ -181,18 +158,14 @@ def _dashboard() -> None:
         return
 
     username = st.session_state[AUTH_USERNAME]
-    connection = get_connection()
-    try:
-        user = get_user_by_username(connection, username)
-    finally:
-        connection.close()
-    if user is None:
+    status = _public_account_status(username)
+    if status is None:
         logout(st.session_state)
         st.warning("Please sign in to view your dashboard.")
         return
 
-    totp_enabled = bool(user["totp_enabled"])
-    st.markdown(f"### Welcome, {username}")
+    totp_enabled = status["totp_enabled"]
+    st.markdown(f"### Welcome, {status['username']}")
     st.markdown(
         f'<span class="status-pill status-on">Authenticated</span>'
         f'<span class="status-pill {"status-on" if totp_enabled else "status-off"}">'
@@ -202,19 +175,15 @@ def _dashboard() -> None:
     st.write("")
     col_a, col_b = st.columns(2)
     with col_a:
-        st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-        st.markdown("**Account**")
-        st.write(f"Username: `{username}`")
+        st.subheader("Account")
+        st.write(f"Username: `{status['username']}`")
         st.write("Password: stored as a salted PBKDF2 hash only")
-        st.markdown("</div>", unsafe_allow_html=True)
     with col_b:
-        st.markdown('<div class="panel-card">', unsafe_allow_html=True)
-        st.markdown("**Two-factor authentication**")
+        st.subheader("Two-factor authentication")
         if totp_enabled:
             st.write("An authenticator app is required at sign-in.")
         else:
             st.write("Optional. Enable it below when you are ready.")
-        st.markdown("</div>", unsafe_allow_html=True)
 
     if totp_enabled:
         clear_enrolment(st.session_state)
@@ -222,10 +191,25 @@ def _dashboard() -> None:
     else:
         _enrolment_panel(username)
 
-    if st.button("Log out"):
+    if st.button("Log out", key="logout_button"):
         logout(st.session_state)
         st.session_state[NAV_PAGE] = "Login"
         st.rerun()
+
+
+def _public_account_status(username: str) -> dict | None:
+    """Return only fields the dashboard is allowed to show."""
+    connection = get_connection()
+    try:
+        user = get_user_by_username(connection, username)
+    finally:
+        connection.close()
+    if user is None:
+        return None
+    return {
+        "username": user["username"],
+        "totp_enabled": bool(user["totp_enabled"]),
+    }
 
 
 def _enrolment_panel(username: str) -> None:
@@ -233,8 +217,12 @@ def _enrolment_panel(username: str) -> None:
     st.caption("Re-enter your password to start. TOTP stays off until you confirm a valid code.")
 
     with st.form("start_totp_form"):
-        password = st.text_input("Account password", type="password", key="enrol_start_password")
-        start = st.form_submit_button("Generate authenticator QR code")
+        password = st.text_input(
+            "Account password", type="password", key="enrol_start_password"
+        )
+        start = st.form_submit_button(
+            "Generate authenticator QR code", key="start_totp_submit"
+        )
     if start:
         connection = get_connection()
         try:
@@ -251,7 +239,7 @@ def _enrolment_panel(username: str) -> None:
         st.session_state[ENROL_QR_PNG] = enrolment.qr_png
         if secret:
             st.session_state[ENROL_MANUAL_KEY] = secret
-        st.success("Scan the QR code, then confirm with a one-time code.")
+        st.rerun()
 
     qr_png = st.session_state.get(ENROL_QR_PNG)
     if not qr_png:
@@ -265,9 +253,13 @@ def _enrolment_panel(username: str) -> None:
             st.caption("Treat this key like a password. It is shown only during setup.")
 
     with st.form("confirm_totp_form"):
-        password = st.text_input("Account password", type="password", key="enrol_confirm_password")
-        otp = st.text_input("6-digit code from your authenticator")
-        confirm = st.form_submit_button("Confirm and enable 2FA")
+        password = st.text_input(
+            "Account password", type="password", key="enrol_confirm_password"
+        )
+        otp = st.text_input("6-digit code from your authenticator", key="enrol_otp")
+        confirm = st.form_submit_button(
+            "Confirm and enable 2FA", key="confirm_totp_submit"
+        )
     if not confirm:
         return
     connection = get_connection()
@@ -282,7 +274,7 @@ def _enrolment_panel(username: str) -> None:
     finally:
         connection.close()
     clear_enrolment(st.session_state)
-    st.success("Two-factor authentication is now enabled.")
+    set_flash(st.session_state, "Two-factor authentication is now enabled.")
     st.rerun()
 
 
@@ -320,6 +312,16 @@ def _case_study() -> None:
         per password, and a **32-byte** derived key. Verification uses
         `hmac.compare_digest()`. That path is independent of the SHA-1 demo below.
         """
+    )
+    st.markdown(
+        "| Property | Unsalted SHA-1 | Salted PBKDF2-HMAC-SHA256 |\n"
+        "| --- | --- | --- |\n"
+        "| Salt | None; same password gives the same hash | Unique random salt per account |\n"
+        "| Guessing cost | Very fast to compute | 600,000 iterations make each guess slower |\n"
+        "| Practical improvement | Enables hash matching and cheap bulk guessing | "
+        "Stops shared-hash matching and raises the cost of each guess |\n\n"
+        "A salt is stored alongside the hash; it is not a secret. PBKDF2 is "
+        "deliberately slower, but it does not make weak passwords unguessable."
     )
     st.subheader("Safe hashing demonstration")
     st.info(

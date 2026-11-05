@@ -1,6 +1,6 @@
 # Secure User Authentication System Using Password Hashing and OTP
 
-College Information and Network Security project. Users will register and log in with hashed passwords and a TOTP second factor.
+College Information and Network Security project. Users register and log in with hashed passwords and an optional TOTP second factor.
 
 ## Technology stack
 
@@ -14,18 +14,21 @@ College Information and Network Security project. Users will register and log in
 
 ## Current status
 
-**Phase 1: project setup only.** Folder layout, dependencies, ignore rules, and environment template are in place. Authentication, hashing, OTP, database schema, and UI are not implemented yet.
+Phases 1–6 are implemented: project setup, SQLite, password hashing, TOTP and Fernet, authentication workflows, and the Streamlit demonstration UI.
+
+Streamlit session state is used only for this lab UI. It is not a production session manager.
 
 ## Project structure
 
 ```text
 .
-├── app/              # Streamlit UI (later phases)
+├── app.py            # Streamlit entry point
+├── app/              # UI, session helpers, educational demo
 ├── src/
-│   ├── auth/         # Password hashing and OTP (later phases)
-│   ├── crypto/       # Fernet helpers (later phases)
-│   └── db/           # SQLite access (later phases)
-├── tests/            # Pytest tests (later phases)
+│   ├── auth/         # Password hashing, TOTP, registration/login
+│   ├── crypto/       # Fernet helpers
+│   └── db/           # SQLite access
+├── tests/
 ├── data/             # Local SQLite files (gitignored except this folder)
 ├── requirements.txt
 ├── .env.example
@@ -46,20 +49,6 @@ python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 ```
 
-Windows (Command Prompt):
-
-```cmd
-python -m venv .venv
-.venv\Scripts\activate.bat
-```
-
-macOS / Linux:
-
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
 ### 2. Install dependencies
 
 ```powershell
@@ -67,26 +56,25 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
 ```
 
-### 3. Create a local environment file
+### 3. Create a local environment file and Fernet key
 
 ```powershell
 copy .env.example .env
+python -c "from src.crypto.secret_vault import generate_fernet_key; print(generate_fernet_key())"
 ```
 
-macOS / Linux:
+Paste the printed value into `.env` as `FERNET_KEY=...`. Do not commit `.env`.
 
-```bash
-cp .env.example .env
-```
-
-Leave `FERNET_KEY` empty until a later phase generates a real key.
-
-### 4. Confirm the test runner works
+### 4. Run tests
 
 ```powershell
-python -m pytest
+python -m pytest tests -v
 ```
 
-Phase 1 has no tests yet. Pytest will report `collected 0 items` / `no tests ran` and exit with code **5**. That is pytest’s normal “no tests collected” status, not an install failure. A later phase will add tests so the exit code becomes 0.
+### 5. Launch the Streamlit app
 
-Do **not** run Streamlit yet. There is no application entry point in this phase.
+```powershell
+streamlit run app.py
+```
+
+Then open the local URL Streamlit prints (usually `http://localhost:8501`).
