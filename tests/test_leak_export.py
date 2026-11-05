@@ -25,6 +25,7 @@ def test_export_contains_only_stored_hash_data_and_separates_cohort_b(
     cohort_a_username = "known_a"
     cohort_b_email = "known_b@example.test"
     cohort_b_username = "known_b"
+    secure_only_username = "migrated_user"
 
     try:
         legacy_register(
@@ -34,6 +35,7 @@ def test_export_contains_only_stored_hash_data_and_separates_cohort_b(
             connection, cohort_b_email, cohort_b_username, cohort_b_password
         )
         register_user(connection, cohort_a_username, cohort_a_password)
+        register_user(connection, secure_only_username, "fictional-secure-only-password")
         enrollment = start_totp_enrolment(
             connection, cohort_a_username, cohort_a_password
         )
@@ -53,14 +55,20 @@ def test_export_contains_only_stored_hash_data_and_separates_cohort_b(
         cohort_a_email,
         cohort_b_email,
     }
-    assert {row["email"] for row in secure_dump} == {cohort_a_email}
+    assert {row["username"] for row in secure_dump} == {
+        cohort_a_username,
+        secure_only_username,
+    }
     assert all(
         set(row) == {"email", "password_hash"}
         for row in legacy_dump
     )
     assert all(
         set(row)
-        == {"email", "password_hash", "salt", "encrypted_totp_secret"}
+        == {"username", "password_hash", "salt", "encrypted_totp_secret"}
         for row in secure_dump
     )
-    assert secure_dump[0]["encrypted_totp_secret"]
+    cohort_a_record = next(
+        row for row in secure_dump if row["username"] == cohort_a_username
+    )
+    assert cohort_a_record["encrypted_totp_secret"]

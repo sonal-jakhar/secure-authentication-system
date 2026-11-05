@@ -31,6 +31,9 @@ def test_legacy_takeover_accepts_seeded_cohort_a_password(seeded_demo_db):
     _, username, password = COHORT_A[0]
 
     assert takeover_sim.attempt_takeover_legacy(username, password)
+    assert not takeover_sim.attempt_takeover_legacy(
+        username, "incorrect-fictional-password"
+    )
 
 
 def test_secure_takeover_requires_totp_when_password_is_correct(seeded_demo_db):

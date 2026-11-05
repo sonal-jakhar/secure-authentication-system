@@ -52,9 +52,12 @@ def seed_demo_users() -> None:
 
         for email, username, password in COHORT_B:
             _ensure_legacy_user(connection, email, username, password)
-            if get_user_by_username(connection, username) is not None:
+            secure_user = get_user_by_username(connection, username)
+            if secure_user is not None and not _secure_user_password_matches(
+                secure_user, password
+            ):
                 raise RuntimeError(
-                    "A Cohort B demo user unexpectedly exists in the secure table."
+                    "A secure demo account conflicts with existing data."
                 )
     finally:
         connection.close()
@@ -96,16 +99,7 @@ def _ensure_secure_user(
     if user is None:
         raise RuntimeError("A secure demo account could not be created.")
 
-    try:
-        password_matches = verify_password(
-            password,
-            user["password_salt"],
-            user["password_hash"],
-            user["password_iterations"],
-        )
-    except (TypeError, ValueError):
-        password_matches = False
-    if not password_matches:
+    if not _secure_user_password_matches(user, password):
         raise RuntimeError("A seeded secure demo account conflicts with existing data.")
 
     if user["totp_enabled"]:
@@ -125,6 +119,18 @@ def _ensure_secure_user(
         or enrolled_user["pending_encrypted_totp_secret"]
     ):
         raise RuntimeError("A secure demo account's TOTP enrollment did not complete.")
+
+
+def _secure_user_password_matches(user: dict, password: str) -> bool:
+    try:
+        return verify_password(
+            password,
+            user["password_salt"],
+            user["password_hash"],
+            user["password_iterations"],
+        )
+    except (TypeError, ValueError):
+        return False
 
 
 if __name__ == "__main__":

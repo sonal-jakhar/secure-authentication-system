@@ -78,3 +78,21 @@ streamlit run app.py
 ```
 
 Then open the local URL Streamlit prints (usually `http://localhost:8501`).
+
+### 6. Run the fictional takeover demonstration
+
+The demo accounts use a separate SQLite file at `data/demo.db`; they do not
+use `data/users.db`. Seed from the activated virtual environment if you want
+to prepare them before opening the app:
+
+```powershell
+python seed_demo_users.py
+```
+
+In the app, select **Breach Lab > Seed Demo Users** and click **Seed demo users**
+to seed or verify the demo cohorts in place. To test takeover, use a Cohort A
+account in **Account Takeover**. The Legacy option accepts the recovered
+fictional password; the Secure option also requires a current authenticator
+code. Request the secure account's QR code there and scan it with an
+authenticator app. After a fresh seed, wait for the next 30-second code because
+the enrollment confirmation code has already been consumed.

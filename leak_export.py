@@ -25,11 +25,13 @@ def _is_exported_dump(dump: object, kind: str) -> bool:
     return isinstance(dump, _ExportedDump) and dump._kind == kind
 
 
-def export_breach_dump() -> tuple[list[dict[str, str]], list[dict[str, str | None]]]:
+def export_breach_dump() -> tuple[
+    list[dict[str, str]], list[dict[str, str | None]]
+]:
     """Return only password-store fields visible in a demo database dump.
 
-    Secure users store usernames rather than emails, so the email is correlated
-    from the legacy table. The left join preserves every secure user row.
+    Legacy records are identified by email; secure records are identified by
+    username, matching the fields actually stored in each table.
     """
     if not Path(DEMO_DATABASE_PATH).is_file():
         raise FileNotFoundError("Demo database not found; seed it before exporting.")
@@ -46,14 +48,12 @@ def export_breach_dump() -> tuple[list[dict[str, str]], list[dict[str, str | Non
         secure_dump = [
             dict(row)
             for row in connection.execute(
-                "SELECT legacy.email AS email, "
+                "SELECT users.username AS username, "
                 "users.password_hash AS password_hash, "
                 "users.password_salt AS salt, "
                 "users.encrypted_totp_secret AS encrypted_totp_secret "
                 "FROM users "
-                "LEFT JOIN legacy_users AS legacy "
-                "ON legacy.username = users.username COLLATE NOCASE "
-                "ORDER BY legacy.email COLLATE NOCASE, users.username COLLATE NOCASE"
+                "ORDER BY users.username COLLATE NOCASE"
             )
         ]
     finally:

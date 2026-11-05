@@ -20,7 +20,7 @@ WORDLIST_PATH = Path(__file__).with_name("wordlist.txt")
 # 5.1.1.2 and the OWASP Authentication Cheat Sheet's blocklist guidance; no
 # breach-derived password corpus is bundled.
 LEGACY_FIELDS = {"email", "password_hash"}
-SECURE_FIELDS = {"email", "password_hash", "salt", "encrypted_totp_secret"}
+SECURE_FIELDS = {"username", "password_hash", "salt", "encrypted_totp_secret"}
 SECURE_SAMPLE_NOTE = (
     f"Time-boxed sample using {PBKDF2_ITERATIONS:,} PBKDF2 iterations per guess; "
     "PBKDF2 is computationally expensive, not impossible to crack. "
@@ -98,7 +98,7 @@ def attack_secure(
                 matched = False
             if matched:
                 cracked_accounts.append(
-                    {"email": entry["email"], "password": candidate}
+                    {"username": entry["username"], "password": candidate}
                 )
                 break
         if time.perf_counter() >= deadline:
@@ -126,11 +126,15 @@ def _validate_dump(
         raise ValueError("Input must come from export_breach_dump().")
 
     entries = []
+    identifier_field = "email" if expected_kind == "legacy" else "username"
     for entry in raw_entries:
         if not isinstance(entry, Mapping) or set(entry) != expected_fields:
             raise ValueError("Input must use the corresponding exported dump fields.")
-        if not isinstance(entry.get("email"), str):
-            raise ValueError("Exported dump entries must include an email.")
+        if not isinstance(entry.get(identifier_field), str):
+            raise ValueError(
+                f"Exported {expected_kind} dump entries must include a "
+                f"{identifier_field}."
+            )
         if not isinstance(entry.get("password_hash"), str):
             raise ValueError("Exported dump entries must include a password hash.")
         entries.append(dict(entry))

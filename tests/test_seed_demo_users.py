@@ -7,6 +7,7 @@ import sqlite3
 import pytest
 
 import seed_demo_users
+from src.auth.service import register_user
 from src.crypto.secret_vault import decrypt_totp_secret
 
 
@@ -71,6 +72,37 @@ def test_cohort_b_is_legacy_only_and_seeding_is_idempotent(demo_database):
             assert connection.execute(
                 "SELECT 1 FROM users WHERE username = ?", (username,)
             ).fetchone() is None
+    finally:
+        connection.close()
+
+
+def test_matching_preexisting_cohort_b_secure_user_does_not_break_seeding(
+    demo_database,
+):
+    seed_demo_users.seed_demo_users()
+    _, username, password = seed_demo_users.COHORT_B[0]
+    connection = sqlite3.connect(demo_database)
+    connection.row_factory = sqlite3.Row
+    try:
+        user_id = register_user(connection, username, password)
+    finally:
+        connection.close()
+
+    seed_demo_users.seed_demo_users()
+
+    connection = sqlite3.connect(demo_database)
+    try:
+        secure_users = connection.execute(
+            "SELECT COUNT(*) FROM users"
+        ).fetchone()[0]
+        matching_user = connection.execute(
+            "SELECT id FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        assert secure_users == 7
+        assert matching_user[0] == user_id
+        assert connection.execute(
+            "SELECT COUNT(*) FROM legacy_users"
+        ).fetchone()[0] == 8
     finally:
         connection.close()
 

@@ -52,11 +52,9 @@ def test_secure_attack_cracks_correct_first_candidate(
 ):
     database_path = tmp_path / "demo.db"
     connection = _build_demo_database(database_path, monkeypatch, fernet_key)
-    email = "first_guess@example.test"
     username = "first_guess"
     password = "fictional-first-guess-password"
     try:
-        legacy_register(connection, email, username, password)
         register_user(connection, username, password)
         enrollment = start_totp_enrolment(connection, username, password)
         code = pyotp.parse_uri(enrollment.provisioning_uri).now()
@@ -72,7 +70,7 @@ def test_secure_attack_cracks_correct_first_candidate(
     )
 
     assert result["cracked_count"] == 1
-    assert result["cracked_accounts"] == [{"email": email, "password": password}]
+    assert result["cracked_accounts"] == [{"username": username, "password": password}]
     assert "time-boxed sample" in result["note"].lower()
 
 
@@ -84,7 +82,6 @@ def test_secure_attack_stops_near_its_budget_without_a_match(
     email = "budget_test@example.test"
     username = "budget_test"
     try:
-        legacy_register(connection, email, username, "fictional-correct-password")
         register_user(connection, username, "fictional-correct-password")
     finally:
         connection.close()

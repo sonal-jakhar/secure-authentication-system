@@ -2,20 +2,26 @@
 
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
 import streamlit as st
 
 import attack_sim
 import leak_export
-import migrate_on_login
 import seed_demo_users
 import takeover_sim
 from app.legacy_auth import get_legacy_connection
-from migrate_on_login import MigrationResult
-from src.auth.service import AuthResult
-from src.auth.totp import generate_provisioning_uri, generate_qr_png
-from src.crypto.secret_vault import MissingFernetKeyError, decrypt_totp_secret
+from src.auth.service import TotpEnrolmentError
+from src.auth.totp import (
+    TOTP_INTERVAL_SECONDS,
+    generate_provisioning_uri,
+    generate_qr_png,
+)
+from src.crypto.secret_vault import (
+    SecretVaultError,
+    decrypt_totp_secret,
+)
 from src.db.connection import get_connection
 from src.db.users import get_user_by_username
 
@@ -25,7 +31,6 @@ BREACH_LAB_STAGES = (
     "Simulate Database Breach",
     "Password Attack",
     "Account Takeover",
-    "Legacy Account Migration",
 )
 
 
@@ -43,8 +48,6 @@ def render_breach_lab() -> None:
             _export_section()
         elif stage == "Account Takeover":
             _takeover_section()
-        elif stage == "Legacy Account Migration":
-            _migration_section()
         else:
             st.warning("Select a workflow stage from the sidebar.")
 
@@ -55,8 +58,16 @@ def _seed_section() -> None:
     if st.button("Seed demo users", key="lab_seed_button"):
         try:
             seed_demo_users.seed_demo_users()
-        except Exception:
-            st.error("Demo seeding failed. Check the local demo configuration.")
+        except (
+            OSError,
+            sqlite3.Error,
+            RuntimeError,
+            TypeError,
+            ValueError,
+            SecretVaultError,
+            TotpEnrolmentError,
+        ) as exc:
+            st.error(f"Demo seeding failed: {exc}")
         else:
             st.success("Demo users are ready.")
             for key in (
@@ -215,7 +226,10 @@ def _takeover_section() -> None:
         )
         otp = None
         if store == "Secure":
-            otp = st.text_input("One-time code (optional)", key="lab_takeover_otp")
+            otp = st.text_input(
+                "One-time code (required for this secure demo account)",
+                key="lab_takeover_otp",
+            )
         submitted = st.form_submit_button("Attempt takeover", key="lab_takeover_submit")
 
     show_qr = st.checkbox(
@@ -262,79 +276,16 @@ def _show_totp_qr(username: str) -> None:
         return
     try:
         secret = decrypt_totp_secret(user["encrypted_totp_secret"])
-        uri = generate_provisioning_uri(
-            secret,
-            username,
-            issuer="Secure Authentication Demo",
-        )
+        uri = generate_provisioning_uri(secret, user["username"])
         qr_png = generate_qr_png(uri)
-    except MissingFernetKeyError:
-        st.error("TOTP display is unavailable because the local key is not configured.")
+    except SecretVaultError as exc:
+        st.error(f"TOTP display is unavailable: {exc}")
+        return
+    except ValueError:
+        st.error("The stored TOTP enrollment is invalid and cannot be displayed.")
         return
     st.image(qr_png, caption="Scan with an authenticator app to generate a current code.")
-
-
-def _migration_presence(username: str) -> tuple[bool, bool]:
-    connection = get_legacy_connection(DEMO_DATABASE_PATH)
-    try:
-        legacy_exists = connection.execute(
-            "SELECT 1 FROM legacy_users WHERE username = ? COLLATE NOCASE",
-            (username,),
-        ).fetchone() is not None
-        secure_exists = get_user_by_username(connection, username) is not None
-        return legacy_exists, secure_exists
-    finally:
-        connection.close()
-
-
-def _migration_section() -> None:
-    st.subheader("Legacy Account Migration")
-    usernames = [username for _, username, _ in seed_demo_users.COHORT_B]
-    with st.form("lab_migration_form"):
-        username = st.selectbox("Cohort B username", usernames, key="lab_migration_user")
-        password = st.text_input(
-            "Known demo password", type="password", key="lab_migration_password"
-        )
-        submitted = st.form_submit_button("Migrate user", key="lab_migration_submit")
-
-    if submitted:
-        before = _migration_presence(username)
-        try:
-            result = migrate_on_login.migrate_legacy_user(username, password)
-        except Exception:
-            st.error("Migration failed. Check the state of the isolated demo database.")
-        else:
-            after = _migration_presence(username)
-            st.session_state["lab_migration_result"] = (username, result, before, after)
-
-    saved_result = st.session_state.get("lab_migration_result")
-    if not saved_result:
-        return
-    result_username, result, before, after = saved_result
-    if isinstance(result, MigrationResult):
-        if result.success:
-            st.success(f"{result_username} was migrated to the secure store.")
-        else:
-            st.error(f"Migration failed: {result.code.replace('_', ' ')}.")
-    elif isinstance(result, AuthResult):
-        if result.success:
-            st.success("No legacy row remained; normal secure login succeeded.")
-        else:
-            st.error(f"No migration was needed; secure login returned {result.code}.")
-
-    st.dataframe(
-        [
-            {
-                "State": "Before",
-                "legacy_users": "Present" if before[0] else "Absent",
-                "users": "Present" if before[1] else "Absent",
-            },
-            {
-                "State": "After",
-                "legacy_users": "Present" if after[0] else "Absent",
-                "users": "Present" if after[1] else "Absent",
-            },
-        ],
-        width="stretch",
-        hide_index=True,
+    st.caption(
+        "If you just seeded the demo, wait for the next "
+        f"{TOTP_INTERVAL_SECONDS}-second code; the enrollment code was already used."
     )
