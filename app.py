@@ -14,10 +14,9 @@ import streamlit as st
 from app.ui import run
 
 st.set_page_config(
-    page_title="Secure Authentication System",
-    page_icon="🔐",
+    page_title="Secure Authentication Lab",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
 run()

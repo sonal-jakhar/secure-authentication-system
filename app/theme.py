@@ -11,9 +11,10 @@ CSS = """
         --muted: #5f6b77;
         --line: #dce2e8;
         --surface: #ffffff;
-        --canvas: #f7f8fa;
+        --canvas: #f2f4f7;
+        --navy: #183b62;
+        --navy-hover: #112d4b;
         --blue: #245b8f;
-        --blue-hover: #19466f;
         --green-bg: #e8f4ec;
         --green-ink: #24613a;
         --amber-bg: #fff4dc;
@@ -33,7 +34,7 @@ CSS = """
     }
 
     [data-testid="stSidebar"] {
-        background: #f0f3f6;
+        background: #fff;
         border-right: 1px solid var(--line);
     }
 
@@ -49,6 +50,26 @@ CSS = """
     h1 { font-size: 1.9rem !important; }
     h2 { font-size: 1.4rem !important; }
     h3 { font-size: 1.12rem !important; }
+
+    .app-header-title {
+        color: var(--ink);
+        font-size: 1.25rem;
+        font-weight: 650;
+        line-height: 1.35;
+    }
+
+    .local-demo-indicator {
+        margin-top: 0.35rem;
+        padding: 0.3rem 0.55rem;
+        color: var(--navy);
+        background: #eaf0f6;
+        border: 1px solid #d5e0eb;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-align: center;
+        white-space: nowrap;
+    }
 
     .eyebrow {
         color: var(--blue);
@@ -89,8 +110,8 @@ CSS = """
         min-height: 2.45rem;
         padding: 0.45rem 1rem;
         color: #fff;
-        background: var(--blue);
-        border: 1px solid var(--blue);
+        background: var(--navy);
+        border: 1px solid var(--navy);
         border-radius: 4px;
         font-weight: 600;
     }
@@ -98,8 +119,14 @@ CSS = """
     .stButton > button:hover,
     [data-testid="stFormSubmitButton"] > button:hover {
         color: #fff;
-        background: var(--blue-hover);
-        border-color: var(--blue-hover);
+        background: var(--navy-hover);
+        border-color: var(--navy-hover);
+    }
+
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background: var(--surface);
+        border-color: var(--line);
+        border-radius: 5px;
     }
 
     [data-testid="stTextInput"] input {

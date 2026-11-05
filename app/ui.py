@@ -14,7 +14,7 @@ from urllib.parse import parse_qs, urlparse
 
 import streamlit as st
 
-from app.breach_lab import render_breach_lab
+from app.breach_lab import BREACH_LAB_STAGES, render_breach_lab
 from app.demo import SAMPLE_DEMO_PASSWORD, pbkdf2_demo_digest, unsalted_sha1_hex
 from app.session import (
     AUTH_USERNAME,
@@ -45,28 +45,56 @@ from src.db.users import DuplicateUsernameError, get_user_by_username
 def run() -> None:
     apply()
     initialize_database()
+    _application_header()
+
+    section = st.sidebar.radio(
+        "Workspace",
+        ("Account", "Breach Lab"),
+        key="app_section",
+    )
+    if section == "Breach Lab":
+        st.sidebar.radio(
+            "Breach Lab workflow",
+            BREACH_LAB_STAGES,
+            key="breach_lab_stage",
+        )
+        render_breach_lab()
+        return
+
     account_page = st.session_state.get(NAV_PAGE, "Login")
     if account_page not in {"Register", "Login", "Dashboard", "Case study"}:
         account_page = "Dashboard" if is_authenticated(st.session_state) else "Login"
         st.session_state[NAV_PAGE] = account_page
 
-    account_tab, breach_tab = st.tabs(("Account", "Breach Lab"))
-    with account_tab:
-        _show_flash()
-        if account_page == "Register":
-            _register()
-        elif account_page == "Dashboard":
-            _dashboard()
-        elif account_page == "Case study":
-            _case_study()
-        else:
-            _login()
-        st.caption(
-            "Demonstration only. Streamlit session state is not a production-grade "
-            "session mechanism."
+    _show_flash()
+    if account_page == "Register":
+        _register()
+    elif account_page == "Dashboard":
+        _dashboard()
+    elif account_page == "Case study":
+        _case_study()
+    else:
+        _login()
+    st.caption(
+        "Demonstration only. Streamlit session state is not a production-grade "
+        "session mechanism."
+    )
+
+
+def _application_header() -> None:
+    title_col, status_col = st.columns((5, 1))
+    with title_col:
+        st.markdown(
+            '<div class="app-header-title">Secure Authentication Lab</div>',
+            unsafe_allow_html=True,
         )
-    with breach_tab:
-        render_breach_lab()
+        st.caption("LinkedIn Password Breach (2012) · authentication security demonstration")
+    with status_col:
+        st.markdown(
+            '<div class="local-demo-indicator">LOCAL DEMO</div>',
+            unsafe_allow_html=True,
+        )
+    st.divider()
 
 
 def _show_flash() -> None:

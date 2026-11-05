@@ -20,25 +20,37 @@ from src.db.connection import get_connection
 from src.db.users import get_user_by_username
 
 DEMO_DATABASE_PATH = Path(__file__).resolve().parents[1] / "data" / "demo.db"
+BREACH_LAB_STAGES = (
+    "Seed Demo Users",
+    "Simulate Database Breach",
+    "Password Attack",
+    "Account Takeover",
+    "Legacy Account Migration",
+)
 
 
 def render_breach_lab() -> None:
-    st.title("Breach Lab")
+    stage = st.session_state.get("breach_lab_stage", BREACH_LAB_STAGES[0])
     st.caption("Fictional accounts in the isolated demo database only.")
+    if stage == "Password Attack":
+        _attack_section()
+        return
 
-    _seed_section()
-    st.divider()
-    _export_section()
-    st.divider()
-    _attack_section()
-    st.divider()
-    _takeover_section()
-    st.divider()
-    _migration_section()
+    with st.container(border=True):
+        if stage == "Seed Demo Users":
+            _seed_section()
+        elif stage == "Simulate Database Breach":
+            _export_section()
+        elif stage == "Account Takeover":
+            _takeover_section()
+        elif stage == "Legacy Account Migration":
+            _migration_section()
+        else:
+            st.warning("Select a workflow stage from the sidebar.")
 
 
 def _seed_section() -> None:
-    st.subheader("1. Seed demo users")
+    st.subheader("Seed Demo Users")
     st.write("Create the fictional cohorts in `data/demo.db`.")
     if st.button("Seed demo users", key="lab_seed_button"):
         try:
@@ -96,7 +108,7 @@ def _demo_user_roster() -> list[dict[str, str]]:
 
 
 def _export_section() -> None:
-    st.subheader("2. Simulate database breach")
+    st.subheader("Simulate Database Breach")
     st.write("Export the stored fields visible in a database dump.")
     if st.button("Export demo database", key="lab_export_button"):
         try:
@@ -126,32 +138,47 @@ def _export_section() -> None:
 
 
 def _attack_section() -> None:
-    st.subheader("3. Attack the exported dumps")
-    st.write("The secure simulation uses a 30-second time budget.")
+    from src.auth.password import PBKDF2_ITERATIONS
+
+    st.subheader("Password Attack")
+    st.caption("Compare the exported legacy and secure password stores.")
     legacy_col, secure_col = st.columns(2)
     with legacy_col:
-        st.markdown("**Attack legacy dump**")
-        if st.button("Run legacy attack", key="lab_legacy_attack_button"):
-            dump = st.session_state.get("lab_legacy_dump")
-            if dump is None:
-                st.warning("Export the demo database first.")
-            else:
-                st.session_state["lab_legacy_attack"] = attack_sim.attack_legacy(
-                    dump, attack_sim.load_wordlist()
-                )
-        _render_attack_result(st.session_state.get("lab_legacy_attack"), "hashes_per_second")
+        with st.container(border=True):
+            st.markdown("**Legacy · unsalted SHA-1**")
+            st.write("Fast, deterministic hashes. Equal passwords produce equal hashes.")
+            st.markdown("**Attack legacy dump**")
+            if st.button("Run legacy attack", key="lab_legacy_attack_button"):
+                dump = st.session_state.get("lab_legacy_dump")
+                if dump is None:
+                    st.warning("Export the demo database first.")
+                else:
+                    st.session_state["lab_legacy_attack"] = attack_sim.attack_legacy(
+                        dump, attack_sim.load_wordlist()
+                    )
+            _render_attack_result(
+                st.session_state.get("lab_legacy_attack"), "hashes_per_second"
+            )
 
     with secure_col:
-        st.markdown("**Attack secure dump**")
-        if st.button("Run secure attack", key="lab_secure_attack_button"):
-            dump = st.session_state.get("lab_secure_dump")
-            if dump is None:
-                st.warning("Export the demo database first.")
-            else:
-                st.session_state["lab_secure_attack"] = attack_sim.attack_secure(
-                    dump, attack_sim.load_wordlist()
-                )
-        _render_attack_result(st.session_state.get("lab_secure_attack"), "guesses_per_second")
+        with st.container(border=True):
+            st.markdown("**Secure · salted PBKDF2-HMAC-SHA256**")
+            st.write(
+                f"Unique salts and {PBKDF2_ITERATIONS:,} iterations increase the cost "
+                "of each guess; weak passwords are still guessable."
+            )
+            st.markdown("**Attack secure dump**")
+            if st.button("Run secure attack", key="lab_secure_attack_button"):
+                dump = st.session_state.get("lab_secure_dump")
+                if dump is None:
+                    st.warning("Export the demo database first.")
+                else:
+                    st.session_state["lab_secure_attack"] = attack_sim.attack_secure(
+                        dump, attack_sim.load_wordlist()
+                    )
+            _render_attack_result(
+                st.session_state.get("lab_secure_attack"), "guesses_per_second"
+            )
 
 
 def _render_attack_result(result: dict[str, object] | None, rate_key: str) -> None:
@@ -173,7 +200,7 @@ def _render_attack_result(result: dict[str, object] | None, rate_key: str) -> No
 
 
 def _takeover_section() -> None:
-    st.subheader("4. Attempt takeover")
+    st.subheader("Account Takeover")
     usernames = [username for _, username, _ in seed_demo_users.COHORT_A]
     username = st.selectbox("Cohort A username", usernames, key="lab_takeover_user")
     store = st.radio(
@@ -261,7 +288,7 @@ def _migration_presence(username: str) -> tuple[bool, bool]:
 
 
 def _migration_section() -> None:
-    st.subheader("5. Migrate a legacy user")
+    st.subheader("Legacy Account Migration")
     usernames = [username for _, username, _ in seed_demo_users.COHORT_B]
     with st.form("lab_migration_form"):
         username = st.selectbox("Cohort B username", usernames, key="lab_migration_user")
