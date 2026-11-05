@@ -28,6 +28,12 @@ CSS = """
 
     .stApp { background: var(--canvas); }
 
+    [data-testid="stToolbar"],
+    [data-testid="stDecoration"],
+    #MainMenu {
+        display: none !important;
+    }
+
     [data-testid="stMain"] > div {
         max-width: 1120px;
         padding-top: 2rem;
@@ -56,19 +62,6 @@ CSS = """
         font-size: 1.25rem;
         font-weight: 650;
         line-height: 1.35;
-    }
-
-    .local-demo-indicator {
-        margin-top: 0.35rem;
-        padding: 0.3rem 0.55rem;
-        color: var(--navy);
-        background: #eaf0f6;
-        border: 1px solid #d5e0eb;
-        border-radius: 4px;
-        font-size: 0.7rem;
-        font-weight: 700;
-        text-align: center;
-        white-space: nowrap;
     }
 
     .eyebrow {

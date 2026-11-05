@@ -57,9 +57,13 @@ def _visible_text(test_app: AppTest) -> str:
 
 def test_workspace_header_and_single_stage_routing(app: AppTest):
     account_text = _visible_text(app)
-    assert "Secure Authentication Lab" in account_text
+    assert "Secure Authentication System" in account_text
     assert "LinkedIn Password Breach (2012)" in account_text
-    assert "LOCAL DEMO" in account_text
+    assert "LOCAL DEMO" not in account_text
+    assert (
+        "Demonstration only. Streamlit session state is not a production-grade"
+        not in account_text
+    )
     assert "Sign in" in account_text
 
     app.session_state["app_section"] = "Breach Lab"

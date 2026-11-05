@@ -75,25 +75,14 @@ def run() -> None:
         _case_study()
     else:
         _login()
-    st.caption(
-        "Demonstration only. Streamlit session state is not a production-grade "
-        "session mechanism."
-    )
 
 
 def _application_header() -> None:
-    title_col, status_col = st.columns((5, 1))
-    with title_col:
-        st.markdown(
-            '<div class="app-header-title">Secure Authentication Lab</div>',
-            unsafe_allow_html=True,
-        )
-        st.caption("LinkedIn Password Breach (2012) · authentication security demonstration")
-    with status_col:
-        st.markdown(
-            '<div class="local-demo-indicator">LOCAL DEMO</div>',
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        '<div class="app-header-title">Secure Authentication System</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption("LinkedIn Password Breach (2012) · authentication security demonstration")
     st.divider()
 
 
