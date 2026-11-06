@@ -1,5 +1,3 @@
-"""Visual styling for the Streamlit demonstration UI."""
-
 from __future__ import annotations
 
 import streamlit as st
@@ -28,7 +26,6 @@ CSS = """
 
     .stApp { background: var(--canvas); }
 
-    [data-testid="stToolbar"],
     [data-testid="stDecoration"],
     #MainMenu {
         display: none !important;
