@@ -25,7 +25,6 @@ This academic Information and Network Security project implements an authenticat
 17. [Security Considerations](#17-security-considerations)
 18. [Limitations and Future Improvements](#18-limitations-and-future-improvements)
 19. [References](#19-references)
-20. [Author](#20-author)
 
 ## 1. Project Overview
 
